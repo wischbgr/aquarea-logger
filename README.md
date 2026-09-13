@@ -1,73 +1,74 @@
 # aquarea-logger
 
-Logs every value of a Panasonic Aquarea heatpump into sqlite, once per minute. Successor of
-[LWZ303-RS232](../LWZ303-RS232) for the new heatpump: the parsing lives in the
-[CIoT-ESP32-Aquarea](../../../media/veracrypt1/Sources/C++/platformio/CIoT-ESP32-Aquarea) firmware,
-this only asks its web interface (`GET http://<ip>/json`) and stores the answer.
+Log all values of a Panasonic Aquarea heatpump into sqlite, once per minute. No Clouds.
+
+Successor of [LWZ303-RS232](https://github.com/wladimir-computin/LWZ303-RS232) for the new heatpump.
+The protocol lives in the CIoT-ESP32-Aquarea firmware (based on [HeishaMon](https://github.com/Egyras/HeishaMon)),
+this just polls its web interface (`http://<ip>/json`) and stores the answer.
 
 ## Install
 
-```
-pipx install .                      # logger only
-pipx install '.[plot]'              # with matplotlib for aquarea-visualize
-```
-
-or straight from the repository, `pipx install git+<url>`. Without pipx, `pip install .` in a venv
-does the same. This gives the two commands `aquarea-logger` and `aquarea-visualize`.
-
-## Running
-
-```
-aquarea-logger --once            # one sample, printed and stored, to check the connection
-aquarea-logger                   # log forever, aligned to full minutes
-aquarea-logger --host 192.168.176.50 --dir /var/lib/aquarea --interval 60
+```bash
+pipx install git+https://github.com/wischbgr/aquarea-logger
+pipx install 'git+https://github.com/wischbgr/aquarea-logger#egg=aquarea-logger[plot]'   # with plotting
 ```
 
-The databases go to `./log` in the working directory unless `--dir` says otherwise. Errors
-(heatpump unreachable, bad answer) are logged and the next minute is tried again, the process never
-gives up.
+## Usage
+
+```bash
+aquarea-logger --host 192.168.176.50 --once
+
+2026-09-13 18:00:00,012 INFO using log/status_2026_09.db
+HeatpumpState                             1       On
+OperatingModeState                        4       Heat+DHW
+MainInletTemp                          30.5 °C
+MainOutletTemp                         35.0 °C
+OutsideTemp                             8.0 °C
+CompressorFreq                           42 Hz
+DHWTemp                                47.5 °C
+...
+PowerConsumptionNow                     890 W
+PowerProductionNow                     3400 W
+COPNow                                 3.82       3.82
+```
+
+```bash
+aquarea-logger --host 192.168.176.50        # log forever, one row per full minute into ./log
+aquarea-logger --help
+```
+
+Values are the raw numbers of the protocol (`OperatingModeState` is `4`, not `Heat+DHW`).
 
 ## Database
 
-One file per month, `log/status_YYYY_MM.db`, same layout as before:
+One file per month, `log/status_YYYY_MM.db`.
 
-| Table | Content |
-| --- | --- |
-| `status` | `id`, `timestamp` (datetime, local time) plus one column per parameter, e.g. `MainInletTemp`, `DHWTemp`, `CompressorFreq`, `OutsideTemp` |
-| `meta` | `name`, `unit`, `writable` for every parameter |
+* `status`: `id`, `timestamp` and one column per parameter (`MainInletTemp`, `DHWTemp`, `CompressorFreq`, ...)
+* `meta`: `name`, `unit`, `writable` of every parameter
 
-Values are the raw numbers of the protocol as the firmware reports them (`OperatingModeState` is
-`4`, not `Heat+DHW`, see `/params` on the device for the meaning). A few are text, e.g. `Error`.
-Columns are added automatically (by `dataset`) when the firmware starts reporting a new parameter.
+New parameters become new columns automatically.
 
-```
+```bash
 sqlite3 log/status_2026_09.db "SELECT timestamp, OutsideTemp, DHWTemp FROM status ORDER BY timestamp DESC LIMIT 5"
 ```
 
 ## Plotting
 
-```
+```bash
 aquarea-visualize --list
 aquarea-visualize MainInletTemp MainOutletTemp OutsideTemp
 aquarea-visualize DHWTemp DHWTargetTemp --from 2026-09-01 --to 2026-09-07
 ```
 
-Needs the `plot` extra, see Install.
-
 ## Raspberry Pi
 
-```
+```bash
 sudo apt install pipx
-git clone <url> aquarea-logger && cd aquarea-logger
-pipx install .
-mkdir -p ~/aquarea
+pipx install git+https://github.com/wischbgr/aquarea-logger
+mkdir ~/aquarea
 sudo cp aquarea-logger.service /etc/systemd/system/
-sudo systemctl daemon-reload
 sudo systemctl enable --now aquarea-logger
 journalctl -u aquarea-logger -f
 ```
 
-The unit runs as `pi` with `/home/pi/aquarea` as working directory, so the databases end up in
-`/home/pi/aquarea/log/`. Adjust `User`, `WorkingDirectory`, the path of the command and `--host` if
-they differ. After a `git pull`, `pipx install --force .` updates the installed version. To fetch
-the logs back: `scp pi@raspi:aquarea/log/*.db log/`.
+Runs as `pi` in `/home/pi/aquarea`, databases end up in `/home/pi/aquarea/log/`. Adjust the unit file if your paths differ.
