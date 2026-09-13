@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aquarea-logger"
+dynamic = ["version"]
+description = "Logs every value of a Panasonic Aquarea heatpump (CIoT-ESP32-Aquarea firmware) into sqlite, once per minute"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+dependencies = [
+    "dataset>=1.6",
+]
+
+[project.optional-dependencies]
+plot = ["matplotlib"]
+
+[project.scripts]
+aquarea-logger = "aquarea_logger.logger:main"
+aquarea-visualize = "aquarea_logger.visualize:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "aquarea_logger.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

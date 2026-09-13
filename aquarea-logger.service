@@ -1,0 +1,21 @@
+# systemd unit for the Raspberry Pi, assumes `pipx install .` was run as user pi
+#   sudo cp aquarea-logger.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now aquarea-logger
+#   journalctl -u aquarea-logger -f
+[Unit]
+Description=Aquarea heatpump sqlite logger
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+# the databases go to ./log below this directory
+WorkingDirectory=/home/pi/aquarea
+ExecStart=/home/pi/.local/bin/aquarea-logger --host 192.168.176.50
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
